@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+.remember/
+.worktrees/
+.yarn/
+!.yarn/releases
+!.yarn/plugins
+backups/
+docs/superpowers/

@@ -1,0 +1,40 @@
+{
+  "name": "kbac",
+  "version": "1.0.0",
+  "packageManager": "yarn@3.7.0",
+  "description": "",
+  "type": "module",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "cypher": "varlock run -- tsx bin/run-cypher.ts",
+    "db:up": "varlock run -- docker compose -f docker/docker-compose.yml up -d",
+    "db:down": "varlock run -- docker compose -f docker/docker-compose.yml down",
+    "db:wait": "varlock run -- tsx bin/db-wait.ts",
+    "db:reset": "tsx bin/confirm-destructive.ts 'reset graph' && varlock run -- docker compose -f docker/docker-compose.yml down -v && yarn db:up && yarn db:wait && yarn db:seed",
+    "db:seed": "yarn cypher cypher/01-constraints.cypher && yarn cypher cypher/02-indexes.cypher && yarn cypher cypher/03-seed-domains.cypher && yarn cypher cypher/04-seed-tools.cypher && yarn cypher cypher/05-seed-concepts.cypher && yarn cypher cypher/06-seed-systems.cypher && yarn cypher cypher/07-seed-meta-frameworks.cypher",
+    "db:backup": "varlock run -- tsx bin/db-backup.ts",
+    "db:introspect": "varlock run -- tsx bin/db-introspect.ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@clack/prompts": "^1.2.0",
+    "@varlock/1password-plugin": "^0.3.3",
+    "ajv": "^8.17.1",
+    "neo4j-driver": "^6.0.1",
+    "typebox": "^1.0.0",
+    "varlock": "^0.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^3.2.1"
+  }
+}

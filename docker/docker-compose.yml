@@ -1,0 +1,48 @@
+name: kbac
+
+services:
+  neo4j-2026:
+    image: neo4j:2026.02.3-community
+    container_name: neo4j-2026
+    restart: "no"
+
+    ports:
+      - "127.0.0.1:7475:7474"  # HTTP
+      - "127.0.0.1:7688:7687"  # Bolt
+
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
+      - NEO4J_PLUGINS=["apoc", "apoc-extended"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_security_procedures_allowlist=apoc.*
+      - NEO4J_server_bolt_tls__level=DISABLED
+      - NEO4J_server_bolt_enabled=true
+      - NEO4J_server_bolt_listen__address=0.0.0.0:7687
+      # Memory tuning (defaults are 512M — too low for APOC + fulltext indexes)
+      - NEO4J_server_memory_heap_initial__size=1G
+      - NEO4J_server_memory_heap_max__size=1G
+      - NEO4J_server_memory_pagecache_size=512m
+      # Query logging (invaluable for debugging agentic queries)
+      - NEO4J_db_logs_query_enabled=INFO
+      # APOC settings
+      - NEO4J_apoc_export_file_enabled=true
+      - NEO4J_apoc_import_file_enabled=true
+      - NEO4J_apoc_import_file_use__neo4j__config=true
+      - NEO4J_apoc_trigger_enabled=true
+
+    volumes:
+      - neo4j-2026-data:/data
+      - neo4j-2026-logs:/logs
+
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD}", "RETURN 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  neo4j-2026-data:
+    name: neo4j-2026-data
+  neo4j-2026-logs:
+    name: neo4j-2026-logs
