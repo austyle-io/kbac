@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import neo4j from "neo4j-driver";
 import {
   search,
   renderJson,
@@ -11,8 +12,9 @@ import {
   type SearchOptions,
   type ErrorPayload,
 } from "../src/query/index.js";
-import { createValidator } from "../src/validation/validator.js";
-import { closeDriver } from "../src/db/driver.js";
+import { createValidator, ValidationError } from "../src/validation/index.js";
+import { closeDriver } from "../src/db/index.js";
+import { loadEnv } from "../src/config/index.js";
 
 type ParseSuccess = {
   ok: true;
@@ -21,17 +23,21 @@ type ParseSuccess = {
   json: boolean;
 };
 
+type ParseInfo = {
+  ok: "info";
+  kind: "help" | "version";
+  json: boolean;
+};
+
 type ParseFailure = {
   ok: false;
   error: ErrorPayload;
-  help?: boolean;
-  version?: boolean;
   /** Echoes the --json flag detected during parsing so callers can
    *  render error output in the right mode even when validation fails. */
   json: boolean;
 };
 
-export type ParseResult = ParseSuccess | ParseFailure;
+export type ParseResult = ParseSuccess | ParseInfo | ParseFailure;
 
 const HELP_TEXT = `Usage: kbac search <term> [--type <label>] [--limit <n>] [--json]
 
@@ -55,15 +61,13 @@ function readVersion(): string {
 }
 
 export function parseArgv(argv: string[]): ParseResult {
-  // Detect --json up-front so failure paths can echo it back to the caller
-  // and we render in the right mode regardless of where parsing fails.
   const json = argv.includes("--json");
 
   if (argv.includes("--help") || argv.includes("-h")) {
-    return { ok: false, help: true, json, error: { error: "invalid_input", message: "help" } };
+    return { ok: "info", kind: "help", json };
   }
   if (argv.includes("--version") || argv.includes("-v")) {
-    return { ok: false, version: true, json, error: { error: "invalid_input", message: "version" } };
+    return { ok: "info", kind: "version", json };
   }
 
   if (argv.length === 0 || argv[0] !== "search") {
@@ -91,7 +95,7 @@ export function parseArgv(argv: string[]): ParseResult {
   for (let i = 2; i < argv.length; i++) {
     const flag = argv[i];
     if (flag === "--json") {
-      // already captured above; just consume
+      // already captured above
     } else if (flag === "--type") {
       if (i + 1 >= argv.length) {
         return {
@@ -145,34 +149,96 @@ export function parseArgv(argv: string[]): ParseResult {
   return { ok: true, subcommand: "search", options: candidate, json };
 }
 
-function classifyError(e: Error): ErrorPayload["error"] {
+/**
+ * Classify a thrown error into one of the ErrorPayload literal codes.
+ *
+ * Prefers `instanceof` checks where possible (ValidationError, neo4j
+ * driver error classes) over substring matching, which is fragile and
+ * misses messages whose wording diverges from the canonical phrasing.
+ *
+ * Exported so the unit tests in `bin/kbac.test.ts` can pin the
+ * classification contract.
+ */
+export function classifyError(e: Error): ErrorPayload["error"] {
+  if (e instanceof ValidationError) return "schema_mismatch";
+
+  // neo4j-driver throws typed error classes — prefer instanceof.
+  const driverErrors = (neo4j as unknown as { error?: Record<string, unknown> })
+    .error;
+  if (driverErrors) {
+    const ServiceUnavailable = driverErrors.ServiceUnavailable as
+      | (new () => Error)
+      | undefined;
+    const SessionExpired = driverErrors.SessionExpired as
+      | (new () => Error)
+      | undefined;
+    if (ServiceUnavailable && e instanceof ServiceUnavailable)
+      return "neo4j_unreachable";
+    if (SessionExpired && e instanceof SessionExpired) return "neo4j_timeout";
+  }
+
   const msg = e.message.toLowerCase();
-  if (msg.includes("connection refused") || msg.includes("econnrefused")) {
+  if (
+    msg.includes("unauthorized") ||
+    msg.includes("authentication failure") ||
+    msg.includes("authentication failed") ||
+    msg.includes("neo.clienterror.security")
+  ) {
+    return "neo4j_auth_failure";
+  }
+  if (
+    msg.includes("connection refused") ||
+    msg.includes("econnrefused") ||
+    msg.includes("enotfound") ||
+    msg.includes("econnreset")
+  ) {
     return "neo4j_unreachable";
   }
   if (msg.includes("timeout") || msg.includes("timed out")) {
     return "neo4j_timeout";
   }
-  if (msg.includes("validation failed") || msg.includes("search result")) {
-    return "schema_mismatch";
-  }
   return "unexpected";
+}
+
+function exitCodeFor(code: ErrorPayload["error"]): number {
+  switch (code) {
+    case "invalid_input":
+      return 2;
+    case "neo4j_unreachable":
+    case "neo4j_timeout":
+    case "neo4j_auth_failure":
+      return 3;
+    case "schema_mismatch":
+      return 4;
+    default:
+      return 1;
+  }
 }
 
 async function main(): Promise<number> {
   const argv = process.argv.slice(2);
   const parsed = parseArgv(argv);
 
+  if (parsed.ok === "info") {
+    if (parsed.kind === "help") process.stdout.write(HELP_TEXT);
+    else process.stdout.write(`${readVersion()}\n`);
+    return 0;
+  }
+
   if (!parsed.ok) {
-    if (parsed.help) {
-      process.stdout.write(HELP_TEXT);
-      return 0;
-    }
-    if (parsed.version) {
-      process.stdout.write(`${readVersion()}\n`);
-      return 0;
-    }
     process.stderr.write(renderError(parsed.error, parsed.json) + "\n");
+    return 2;
+  }
+
+  // Validate env up-front with actionable error messages.
+  try {
+    loadEnv();
+  } catch (e) {
+    const payload: ErrorPayload = {
+      error: "invalid_input",
+      message: (e as Error).message,
+    };
+    process.stderr.write(renderError(payload, parsed.json) + "\n");
     return 2;
   }
 
@@ -184,18 +250,15 @@ async function main(): Promise<number> {
   } catch (e) {
     const err = e as Error;
     const code = classifyError(err);
-    const payload: ErrorPayload = {
-      error: code,
-      message: err.message,
-    };
-    process.stdout.write(renderError(payload, parsed.json) + "\n");
-    return code === "neo4j_unreachable" || code === "neo4j_timeout"
-      ? 3
-      : code === "schema_mismatch"
-        ? 4
-        : 1;
+    const payload: ErrorPayload = { error: code, message: err.message };
+    process.stderr.write(renderError(payload, parsed.json) + "\n");
+    return exitCodeFor(code);
   } finally {
-    await closeDriver().catch(() => {});
+    await closeDriver().catch((shutdownErr: unknown) => {
+      process.stderr.write(
+        `[kbac] driver shutdown failed: ${String(shutdownErr)}\n`,
+      );
+    });
   }
 }
 
