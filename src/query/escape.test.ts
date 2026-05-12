@@ -44,4 +44,14 @@ describe("escapeLucene", () => {
       "test\\+AND\\+password\\:\\*",
     );
   });
+
+  it("escapes all 17 Lucene special characters concatenated", () => {
+    expect(escapeLucene('+-&|!(){}[]^"~*?:\\/')).toBe(
+      '\\+\\-\\&\\|\\!\\(\\)\\{\\}\\[\\]\\^\\"\\~\\*\\?\\:\\\\\\/',
+    );
+  });
+
+  it("escapes consecutive identical special characters", () => {
+    expect(escapeLucene("+++")).toBe("\\+\\+\\+");
+  });
 });
