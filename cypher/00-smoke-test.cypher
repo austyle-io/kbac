@@ -1,5 +1,5 @@
 // Smoke test: validates Cypher 25 + APOC on Neo4j 2026.x
-// Run: npx varlock run -- sh -c 'cypher-shell -a bolt://localhost:7688 -u neo4j -p "$NEO4J_PASSWORD" < cypher/00-smoke-test.cypher'
+// Run: yarn cypher cypher/00-smoke-test.cypher
 
 // 1. Basic Cypher 25 syntax
 RETURN 1 AS smoke_test;
