@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { readFileSync, realpathSync } from "fs";
 import { resolve, relative, sep } from "path";
 import { loadEnv } from "../src/config/index.js";
 import { closeDriver, withSession } from "../src/db/index.js";
@@ -10,20 +10,37 @@ import { fatal } from "../src/utils/index.js";
  * `cypher/` directory. Prevents argv-driven path traversal (any file the
  * developer has read access to would otherwise be loadable and then sent
  * to Neo4j as a Cypher script).
+ *
+ * Uses `realpathSync` on both ends so that a symlink inside `cypher/`
+ * pointing outside the repo is rejected (lexical-only containment would
+ * accept it because `relative()` sees only the literal path).
+ *
+ * Exported for direct unit testing in `bin/run-cypher.test.ts`.
  */
-function resolveSafeCypherPath(filePath: string): string {
+export function resolveSafeCypherPath(filePath: string): string {
   const repoRoot = resolve(import.meta.dirname, "..");
   const cypherRoot = resolve(repoRoot, "cypher");
-  // SAFE: the resolved path is rejected below unless it is contained
-  // within cypherRoot. The `relative()` check happens before any I/O.
   const absolute = resolve(filePath); // nosemgrep
-  const rel = relative(cypherRoot, absolute);
-  if (rel.startsWith("..") || rel.startsWith(`${sep}`) || rel === "") {
+
+  let realAbsolute: string;
+  let realCypherRoot: string;
+  try {
+    realAbsolute = realpathSync(absolute);
+    realCypherRoot = realpathSync(cypherRoot);
+  } catch (err) {
     throw new Error(
-      `path must be inside ${cypherRoot} — got: ${absolute}`,
+      `path resolution failed for ${absolute}: ${(err as Error).message}`,
     );
   }
-  return absolute;
+
+  const rel = relative(realCypherRoot, realAbsolute);
+  if (rel === "" || rel.startsWith("..") || rel.startsWith(`..${sep}`)) {
+    throw new Error(
+      `path must be inside ${cypherRoot} — got: ${absolute}` +
+        (absolute !== realAbsolute ? ` (resolves to ${realAbsolute})` : ""),
+    );
+  }
+  return realAbsolute;
 }
 
 async function runCypherFile(filePath: string): Promise<void> {
@@ -32,7 +49,17 @@ async function runCypherFile(filePath: string): Promise<void> {
   const statements = splitCypherStatements(cypher);
   try {
     await withSession(async (session) => {
-      for (const statement of statements) await runStatement(session, statement);
+      let i = 0;
+      for (const statement of statements) {
+        try {
+          await runStatement(session, statement);
+        } catch (err) {
+          throw new Error(
+            `statement ${i + 1}/${statements.length} in ${safePath} failed: ${(err as Error).message}`,
+          );
+        }
+        i += 1;
+      }
     });
   } finally {
     await closeDriver();
@@ -42,7 +69,9 @@ async function runCypherFile(filePath: string): Promise<void> {
 function main(): void {
   const file = process.argv[2];
   if (!file) {
-    fatal("Usage: yarn cypher <path-to-cypher-file>  (or: node --env-file-if-exists=.env --import tsx bin/run-cypher.ts <path>)");
+    fatal(
+      "Usage: yarn cypher <path-to-cypher-file>  (or: node --env-file-if-exists=.env --import tsx bin/run-cypher.ts <path>)",
+    );
   }
   try {
     loadEnv();
@@ -52,4 +81,7 @@ function main(): void {
   runCypherFile(file).catch((err: Error) => fatal(`Error: ${err.message}`));
 }
 
-main();
+// Run only when invoked as a script (not when imported by tests).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}
