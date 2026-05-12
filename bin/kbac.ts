@@ -272,5 +272,12 @@ async function main(): Promise<number> {
 // Run only when invoked as a script (not when imported by tests).
 // pathToFileURL correctly URL-encodes spaces and handles Windows paths.
 if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().then((code) => process.exit(code));
+  main()
+    .then((code) => process.exit(code))
+    .catch((e: unknown) => {
+      const message = e instanceof Error ? e.message : String(e);
+      const payload: ErrorPayload = { error: "unexpected", message };
+      process.stderr.write(renderError(payload, false) + "\n");
+      process.exit(1);
+    });
 }
