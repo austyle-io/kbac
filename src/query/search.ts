@@ -22,6 +22,13 @@ const FULLTEXT_INDEXES: Record<NodeLabel, string> = {
 };
 
 function buildCypher(opts: SearchOptions): { cypher: string; params: Record<string, unknown> } {
+  // SECURITY: the per-label fulltext-index name and the `${label}` literal
+  // are concatenated into the Cypher string (not parameterized). This is
+  // safe only because `label` is constrained to the Typebox NodeLabelEnum
+  // (Tool|Concept|Domain|System) and FULLTEXT_INDEXES is a module-level
+  // constant. NEVER feed user-controlled input into either of these — if
+  // you add a label, add it to NodeLabelEnum AND FULLTEXT_INDEXES; if you
+  // ever source index names from config, parameterize them.
   const targets: NodeLabel[] = opts.type ? [opts.type] : NODE_LABELS;
 
   const unionBranches = targets.map(

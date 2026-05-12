@@ -14,6 +14,7 @@ export {
   SearchOptionsSchema,
   SearchResultSchema,
   NodeRowSchema,
+  EntitySchema,
   NodeLabelEnum,
   ErrorPayloadSchema,
 } from "./schemas.js";
