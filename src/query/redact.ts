@@ -28,6 +28,12 @@ const REDACTED_FIELDS = new Set([
 /**
  * Field-name patterns redacted via case-insensitive regex. Catches
  * camelCase composites like `userCredentials` or `myAccessToken`.
+ *
+ * `/auth/i` is intentionally broad — it matches `myAuth`, `apiAuth`, and
+ * also `author`, `authorId`, `authentication`. The kbac graph schema does
+ * not currently include `author`-like fields, so this is an acceptable
+ * scope-wide redaction. If author metadata is added to the graph in the
+ * future, tighten this pattern (e.g. `/(^|_)auth($|_|orization$)/i`).
  */
 const REDACTED_PATTERNS = [
   /api.?key/i,
@@ -51,6 +57,12 @@ function shouldRedact(key: string): boolean {
  * new object with no mutation of input. Arrays are passed through
  * unchanged; recursion stops past `MAX_DEPTH` to prevent runaway on
  * pathological inputs.
+ *
+ * **Security note:** values nested deeper than `MAX_DEPTH` (4 levels)
+ * are passed through unredacted by design. A sensitive field at
+ * nesting depth 5+ silently leaks. For input that may exceed this
+ * depth, callers should flatten first or raise `MAX_DEPTH`. Graph-node
+ * properties from kbac never nest beyond two levels in practice.
  */
 export function redactEntity(
   properties: Record<string, unknown>,
