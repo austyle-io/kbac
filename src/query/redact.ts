@@ -30,9 +30,9 @@ const REDACTED_FIELDS = new Set([
  * camelCase composites like `userCredentials` or `myAccessToken`.
  *
  * `/auth/i` is intentionally broad — it matches `myAuth`, `apiAuth`, and
- * also `author`, `authorId`, `authentication`. The kbac graph schema does
- * not currently include `author`-like fields, so this is an acceptable
- * scope-wide redaction. If author metadata is added to the graph in the
+ * also `author`, `authorId`, `authentication`. This is a codebase-wide
+ * acceptable false-positive: the kbac graph schema does not currently
+ * include `author`-like fields. If author metadata is added in the
  * future, tighten this pattern (e.g. `/(^|_)auth($|_|orization$)/i`).
  */
 const REDACTED_PATTERNS = [
@@ -55,14 +55,20 @@ function shouldRedact(key: string): boolean {
 /**
  * Recursively redact sensitive fields from a property bag, returning a
  * new object with no mutation of input. Arrays are passed through
- * unchanged; recursion stops past `MAX_DEPTH` to prevent runaway on
- * pathological inputs.
+ * unchanged.
  *
- * **Security note:** values nested deeper than `MAX_DEPTH` (4 levels)
- * are passed through unredacted by design. A sensitive field at
- * nesting depth 5+ silently leaks. For input that may exceed this
- * depth, callers should flatten first or raise `MAX_DEPTH`. Graph-node
- * properties from kbac never nest beyond two levels in practice.
+ * **Depth behavior:** keys at depths 0, 1, 2, 3, and 4 are all checked
+ * against `shouldRedact`. Recursion stops *into* objects at depth 4 —
+ * meaning a sensitive key whose value is itself an object nested at
+ * depth 5 or deeper will NOT be visited and its sub-keys will pass
+ * through unredacted. The `MAX_DEPTH = 4` constant controls this.
+ *
+ * **Security note:** the depth limit is a fail-safe, not a guarantee.
+ * Graph-node properties from kbac never nest beyond two levels in
+ * practice, so the depth-5+ leak is unreachable for current data. If
+ * deeper structures are introduced (e.g. stored config blobs), either
+ * flatten before passing, raise `MAX_DEPTH`, or change this function
+ * to throw on objects at the boundary.
  */
 export function redactEntity(
   properties: Record<string, unknown>,

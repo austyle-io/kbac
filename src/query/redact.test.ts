@@ -103,4 +103,36 @@ describe("redactEntity", () => {
     expect(redactEntity({ private: "x" }).private).toBe("[REDACTED]");
     expect(redactEntity({ privateKey: "x" }).privateKey).toBe("[REDACTED]");
   });
+
+  it("redacts exact match: bearer", () => {
+    expect(redactEntity({ bearer: "tok" }).bearer).toBe("[REDACTED]");
+  });
+
+  it("redacts exact match: key (bare field)", () => {
+    expect(redactEntity({ key: "ssh-rsa" }).key).toBe("[REDACTED]");
+  });
+
+  it("redacts exact match: access_token and accesstoken", () => {
+    expect(redactEntity({ access_token: "x" }).access_token).toBe("[REDACTED]");
+    expect(redactEntity({ accesstoken: "x" }).accesstoken).toBe("[REDACTED]");
+  });
+
+  it("redacts exact match: refresh_token and refreshtoken", () => {
+    expect(redactEntity({ refresh_token: "x" }).refresh_token).toBe(
+      "[REDACTED]",
+    );
+    expect(redactEntity({ refreshtoken: "x" }).refreshtoken).toBe("[REDACTED]");
+  });
+
+  it("redacts exact match: client_secret and clientsecret", () => {
+    expect(redactEntity({ client_secret: "x" }).client_secret).toBe(
+      "[REDACTED]",
+    );
+    expect(redactEntity({ clientsecret: "x" }).clientsecret).toBe("[REDACTED]");
+  });
+
+  it("redacts exact match: private_key and privatekey", () => {
+    expect(redactEntity({ private_key: "x" }).private_key).toBe("[REDACTED]");
+    expect(redactEntity({ privatekey: "x" }).privatekey).toBe("[REDACTED]");
+  });
 });
