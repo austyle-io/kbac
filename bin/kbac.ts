@@ -26,6 +26,9 @@ type ParseFailure = {
   error: ErrorPayload;
   help?: boolean;
   version?: boolean;
+  /** Echoes the --json flag detected during parsing so callers can
+   *  render error output in the right mode even when validation fails. */
+  json: boolean;
 };
 
 export type ParseResult = ParseSuccess | ParseFailure;
@@ -52,16 +55,21 @@ function readVersion(): string {
 }
 
 export function parseArgv(argv: string[]): ParseResult {
+  // Detect --json up-front so failure paths can echo it back to the caller
+  // and we render in the right mode regardless of where parsing fails.
+  const json = argv.includes("--json");
+
   if (argv.includes("--help") || argv.includes("-h")) {
-    return { ok: false, help: true, error: { error: "invalid_input", message: "help" } };
+    return { ok: false, help: true, json, error: { error: "invalid_input", message: "help" } };
   }
   if (argv.includes("--version") || argv.includes("-v")) {
-    return { ok: false, version: true, error: { error: "invalid_input", message: "version" } };
+    return { ok: false, version: true, json, error: { error: "invalid_input", message: "version" } };
   }
 
   if (argv.length === 0 || argv[0] !== "search") {
     return {
       ok: false,
+      json,
       error: {
         error: "invalid_input",
         message: "unknown subcommand; only 'search' is supported",
@@ -72,6 +80,7 @@ export function parseArgv(argv: string[]): ParseResult {
   if (argv.length < 2) {
     return {
       ok: false,
+      json,
       error: { error: "invalid_input", message: "search requires a term" },
     };
   }
@@ -79,19 +88,33 @@ export function parseArgv(argv: string[]): ParseResult {
 
   let type: string | undefined;
   let limit = 10;
-  let json = false;
   for (let i = 2; i < argv.length; i++) {
     const flag = argv[i];
     if (flag === "--json") {
-      json = true;
+      // already captured above; just consume
     } else if (flag === "--type") {
+      if (i + 1 >= argv.length) {
+        return {
+          ok: false,
+          json,
+          error: { error: "invalid_input", message: "--type requires a value" },
+        };
+      }
       type = argv[++i];
     } else if (flag === "--limit") {
+      if (i + 1 >= argv.length) {
+        return {
+          ok: false,
+          json,
+          error: { error: "invalid_input", message: "--limit requires a value" },
+        };
+      }
       const raw = argv[++i];
       const parsed = Number.parseInt(raw, 10);
       if (Number.isNaN(parsed)) {
         return {
           ok: false,
+          json,
           error: { error: "invalid_input", message: `--limit must be an integer, got: ${raw}` },
         };
       }
@@ -99,6 +122,7 @@ export function parseArgv(argv: string[]): ParseResult {
     } else {
       return {
         ok: false,
+        json,
         error: { error: "invalid_input", message: `unknown flag: ${flag}` },
       };
     }
@@ -109,6 +133,7 @@ export function parseArgv(argv: string[]): ParseResult {
   if (!validator.validate(candidate)) {
     return {
       ok: false,
+      json,
       error: {
         error: "invalid_input",
         message:
@@ -147,7 +172,7 @@ async function main(): Promise<number> {
       process.stdout.write(`${readVersion()}\n`);
       return 0;
     }
-    process.stderr.write(renderError(parsed.error, true) + "\n");
+    process.stderr.write(renderError(parsed.error, parsed.json) + "\n");
     return 2;
   }
 

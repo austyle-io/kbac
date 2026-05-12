@@ -64,4 +64,22 @@ describe("parseArgv", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.version).toBe(true);
   });
+
+  it("rejects --type with no value following", () => {
+    const r = parseArgv(["search", "x", "--type"]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.message).toContain("--type requires a value");
+  });
+
+  it("rejects --limit with no value following", () => {
+    const r = parseArgv(["search", "x", "--limit"]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.message).toContain("--limit requires a value");
+  });
+
+  it("echoes the --json flag on parse failure so callers can render correctly", () => {
+    const r = parseArgv(["search", "x", "--bad-flag", "--json"]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.json).toBe(true);
+  });
 });
