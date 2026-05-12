@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# bin/kbac — wrapper that injects the varlock-resolved environment and runs
+# bin/kbac.ts. Designed to be symlinked into ~/.local/bin so the binary
+# resolves on $PATH from any working directory.
+
+set -euo pipefail
+
+# Resolve symlinks so we can find the repo root even when invoked via
+# ~/.local/bin/kbac. `readlink -f` is not portable on macOS; the loop
+# below is the BSD-compatible equivalent.
+target="${BASH_SOURCE[0]}"
+while [ -L "$target" ]; do
+  link="$(readlink "$target")"
+  case "$link" in
+    /*) target="$link" ;;
+    *)  target="$(cd "$(dirname "$target")" && pwd)/$link" ;;
+  esac
+done
+repo_root="$(cd "$(dirname "$target")/.." && pwd)"
+
+cd "$repo_root"
+exec npx varlock run -- tsx bin/kbac.ts "$@"
