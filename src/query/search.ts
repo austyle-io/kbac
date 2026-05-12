@@ -56,8 +56,8 @@ function buildCypher(opts: SearchOptions): { cypher: string; params: Record<stri
  * unset), redacts sensitive properties on each row, and returns a
  * Typebox-validated SearchResult.
  *
- * The caller is responsible for ensuring varlock-injected NEO4J_*
- * environment variables are present.
+ * The caller is responsible for ensuring NEO4J_* environment variables
+ * are present (typically via .env file or exported shell variables).
  */
 export async function search(opts: SearchOptions): Promise<SearchResult> {
   const startedAt = Date.now();

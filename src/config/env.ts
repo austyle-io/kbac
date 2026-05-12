@@ -4,10 +4,11 @@ import { createValidator } from "../validation/validator.js";
 // ============================================================================
 // Environment configuration
 // ----------------------------------------------------------------------------
-// Credentials are injected by `varlock run`. Defaults are applied BEFORE
-// validation so optional vars satisfy `minLength: 1`. Required vars
-// (NEO4J_PASSWORD) have no default; if missing they remain `undefined` and
-// the AJV validator fails fast at startup with a precise error path.
+// Credentials are loaded from `.env` (via Node's --env-file-if-exists flag in
+// scripts and the bin/kbac wrapper) or from the inherited shell environment.
+// Defaults are applied BEFORE validation so optional vars satisfy `minLength`.
+// Required vars (NEO4J_PASSWORD) have no default; if missing they remain
+// `undefined` and the AJV validator fails fast with a precise error path.
 // ============================================================================
 
 export const EnvSchema = Type.Object({
@@ -32,7 +33,7 @@ const envValidator = createValidator<Env>(EnvSchema);
  */
 const REMEDIATION_HINTS: Record<string, string> = {
   NEO4J_PASSWORD:
-    "run the command via `varlock run -- <cmd>` so Varlock injects the password from 1Password (see docs/ARCHITECTURE.md#credential-flow)",
+    "copy .env.example to .env and fill in NEO4J_PASSWORD, or export it in your shell. See docs/ARCHITECTURE.md#credential-flow.",
   NEO4J_URI:
     "set to a Bolt URL like `bolt://localhost:7688` (schemes: bolt, bolt+s, bolt+ssc, neo4j, neo4j+s, neo4j+ssc)",
   NEO4J_USERNAME: "defaults to 'neo4j' — set only if your database uses a different user",

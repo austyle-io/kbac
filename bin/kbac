@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-# bin/kbac — wrapper that injects the varlock-resolved environment and runs
-# bin/kbac.ts. Designed to be symlinked into ~/.local/bin so the binary
-# resolves on $PATH from any working directory.
+# bin/kbac — wrapper that loads .env (via Node's native --env-file-if-exists)
+# and runs bin/kbac.ts. Designed to be symlinked into ~/.local/bin so the
+# binary resolves on $PATH from any working directory.
+#
+# Env precedence: real env vars (exported or set inline) win over .env.
+# Node's --env-file does NOT overwrite already-set variables, so callers
+# can do `NEO4J_PASSWORD=... kbac search ...` to override on the fly.
+# When .env is absent (e.g. CI), the flag is a no-op and the process
+# uses whatever env vars the caller supplied.
 
 set -euo pipefail
 
@@ -19,4 +25,4 @@ done
 repo_root="$(cd "$(dirname "$target")/.." && pwd)"
 
 cd "$repo_root"
-exec npx varlock run -- tsx bin/kbac.ts "$@"
+exec node --env-file-if-exists=.env --import tsx bin/kbac.ts "$@"

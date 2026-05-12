@@ -476,15 +476,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@varlock/1password-plugin@npm:^0.3.3":
-  version: 0.3.3
-  resolution: "@varlock/1password-plugin@npm:0.3.3"
-  peerDependencies:
-    varlock: ^0.7.2
-  checksum: 957161c00f621f4244d472b5f9edb59081feb84ec0e88e5c621368651de0356028f8b36baed58b57edb0d67d0dff46809dec40b0fa010e426431ca94dbe24dbd
-  languageName: node
-  linkType: hard
-
 "@vitest/expect@npm:3.2.4":
   version: 3.2.4
   resolution: "@vitest/expect@npm:3.2.4"
@@ -1014,13 +1005,11 @@ __metadata:
   dependencies:
     "@clack/prompts": ^1.2.0
     "@types/node": ^25.5.2
-    "@varlock/1password-plugin": ^0.3.3
     ajv: ^8.17.1
     neo4j-driver: ^6.0.1
     tsx: ^4.21.0
     typebox: ^1.0.0
     typescript: ^6.0.2
-    varlock: ^0.7.2
     vitest: ^3.2.1
   languageName: unknown
   linkType: soft
@@ -1637,15 +1626,6 @@ __metadata:
   version: 7.18.2
   resolution: "undici-types@npm:7.18.2"
   checksum: 23da306c8366574adec305b06a8519ab5c7d09e3f5d16c1a98709a34fae17da09ec95198f30f86c00055e02efa8bfcc843e84e8aebeb9b8d6bb3e06afccae07a
-  languageName: node
-  linkType: hard
-
-"varlock@npm:^0.7.2":
-  version: 0.7.2
-  resolution: "varlock@npm:0.7.2"
-  bin:
-    varlock: bin/cli.js
-  checksum: 37707183a580126b342b46159381288296c23a73804030aa5db0fdfdba9e90002ba4494922e33660c591adeaff9a1a36529b432315b006263709949d0f15da84
   languageName: node
   linkType: hard
 
