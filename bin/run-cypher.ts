@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync } from "fs";
-import { resolve, relative, sep } from "path";
+import { resolve, relative, isAbsolute } from "path";
 import { loadEnv } from "../src/config/index.js";
 import { closeDriver, withSession } from "../src/db/index.js";
 import { runStatement, splitCypherStatements } from "../src/cypher/index.js";
@@ -33,8 +33,11 @@ export function resolveSafeCypherPath(filePath: string): string {
     );
   }
 
+  // On Windows, path.relative() returns an absolute path when its two
+  // arguments are on different drives. isAbsolute() catches that case in
+  // addition to the standard `..` traversal check.
   const rel = relative(realCypherRoot, realAbsolute);
-  if (rel === "" || rel.startsWith("..") || rel.startsWith(`..${sep}`)) {
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
     throw new Error(
       `path must be inside ${cypherRoot} — got: ${absolute}` +
         (absolute !== realAbsolute ? ` (resolves to ${realAbsolute})` : ""),

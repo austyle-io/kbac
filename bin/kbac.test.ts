@@ -84,6 +84,23 @@ describe("parseArgv", () => {
     if (!r.ok) expect(r.json).toBe(true);
   });
 
+  it("rejects partially numeric --limit values (e.g., '10abc')", () => {
+    const r = parseArgv(["search", "x", "--limit", "10abc"]);
+    expect(r.ok).toBe(false);
+    if (r.ok === false) {
+      expect(r.error.error).toBe("invalid_input");
+      expect(r.error.message).toContain("--limit must be an integer");
+    }
+  });
+
+  it("rejects --limit values that are floats", () => {
+    const r = parseArgv(["search", "x", "--limit", "5.5"]);
+    expect(r.ok).toBe(false);
+    if (r.ok === false) {
+      expect(r.error.error).toBe("invalid_input");
+    }
+  });
+
   it("returns ParseInfo (kind=help) for --help", () => {
     const r = parseArgv(["--help"]);
     expect(r.ok).toBe("info");
@@ -138,5 +155,13 @@ describe("classifyError", () => {
     expect(classifyError(new Error("something weird happened"))).toBe(
       "unexpected",
     );
+  });
+
+  it("safely handles non-Error throws (e.g., plain strings)", () => {
+    expect(classifyError("connection refused" as unknown)).toBe(
+      "neo4j_unreachable",
+    );
+    expect(classifyError(42 as unknown)).toBe("unexpected");
+    expect(classifyError(undefined as unknown)).toBe("unexpected");
   });
 });

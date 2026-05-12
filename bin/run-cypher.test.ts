@@ -4,7 +4,6 @@ import {
   rmSync,
   symlinkSync,
   writeFileSync,
-  mkdirSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -38,10 +37,16 @@ describe("resolveSafeCypherPath — symlink hardening", () => {
   let evilDir: string;
   let symlinkPath: string;
 
+  // PID + timestamp suffix prevents collisions across interrupted test
+  // runs that may have left a stale symlink behind.
+  const symlinkBasename = `evil-symlink-${process.pid}-${Date.now()}.cypher`;
+  let symlinkRelative: string;
+
   beforeAll(() => {
     evilDir = mkdtempSync(join(tmpdir(), "kbac-symlink-test-"));
     writeFileSync(join(evilDir, "evil.cypher"), "RETURN 1;");
-    symlinkPath = join(cypherRoot, "evil-symlink.cypher");
+    symlinkPath = join(cypherRoot, symlinkBasename);
+    symlinkRelative = `cypher/${symlinkBasename}`;
     symlinkSync(join(evilDir, "evil.cypher"), symlinkPath);
   });
 
@@ -51,7 +56,7 @@ describe("resolveSafeCypherPath — symlink hardening", () => {
   });
 
   it("rejects a symlink inside cypher/ that points outside the repo", () => {
-    expect(() => resolveSafeCypherPath("cypher/evil-symlink.cypher")).toThrow(
+    expect(() => resolveSafeCypherPath(symlinkRelative)).toThrow(
       /path must be inside|symlink/i,
     );
   });

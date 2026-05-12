@@ -114,8 +114,11 @@ export function parseArgv(argv: string[]): ParseResult {
         };
       }
       const raw = argv[++i];
-      const parsed = Number.parseInt(raw, 10);
-      if (Number.isNaN(parsed)) {
+      // Number() rejects partial-numeric inputs like "10abc" (parseInt would
+      // silently accept them as 10). Number.isInteger then rules out NaN,
+      // Infinity, and non-integer numerics.
+      const parsed = Number(raw);
+      if (!Number.isInteger(parsed)) {
         return {
           ok: false,
           json,
@@ -159,8 +162,12 @@ export function parseArgv(argv: string[]): ParseResult {
  * Exported so the unit tests in `bin/kbac.test.ts` can pin the
  * classification contract.
  */
-export function classifyError(e: Error): ErrorPayload["error"] {
+export function classifyError(e: unknown): ErrorPayload["error"] {
   if (e instanceof ValidationError) return "schema_mismatch";
+
+  // Extract a string message safely whether `e` is an Error, a string, or
+  // any other thrown value. Defensive against `throw "string"` and similar.
+  const message = e instanceof Error ? e.message : String(e);
 
   // neo4j-driver throws typed error classes — prefer instanceof.
   const driverErrors = (neo4j as unknown as { error?: Record<string, unknown> })
@@ -177,7 +184,7 @@ export function classifyError(e: Error): ErrorPayload["error"] {
     if (SessionExpired && e instanceof SessionExpired) return "neo4j_timeout";
   }
 
-  const msg = e.message.toLowerCase();
+  const msg = message.toLowerCase();
   if (
     msg.includes("unauthorized") ||
     msg.includes("authentication failure") ||
@@ -248,9 +255,9 @@ async function main(): Promise<number> {
     process.stdout.write("\n");
     return 0;
   } catch (e) {
-    const err = e as Error;
-    const code = classifyError(err);
-    const payload: ErrorPayload = { error: code, message: err.message };
+    const code = classifyError(e);
+    const message = e instanceof Error ? e.message : String(e);
+    const payload: ErrorPayload = { error: code, message };
     process.stderr.write(renderError(payload, parsed.json) + "\n");
     return exitCodeFor(code);
   } finally {

@@ -2,7 +2,7 @@
 
 kbac incorporates three reusable meta-frameworks. Each is a System node in the knowledge graph with its own tools, concepts, and architectural pattern.
 
-```
+```text
                        ┌─────────┐
                        │  kbac   │
                        └────┬────┘
@@ -173,7 +173,7 @@ cypher/
 
 kbac is the top-level System that incorporates all three meta-frameworks:
 
-```
+```text
 kbac
  ├── DEPENDS_ON (incorporates) → TypeBox+AJV Validation Stack
  │     └── validates data at the neo4j-driver boundary
