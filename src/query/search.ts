@@ -8,6 +8,8 @@ import {
   type SearchResult,
   type Entity,
   type NodeLabel,
+  type NodeRow,
+  NodeRowSchema,
   SearchResultSchema,
 } from "./schemas.js";
 
@@ -18,12 +20,6 @@ const FULLTEXT_INDEXES: Record<NodeLabel, string> = {
   Domain: "domain_search",
   System: "system_search",
 };
-
-interface RawRow {
-  node: { id: string; name: string; properties: Record<string, unknown> };
-  label: NodeLabel;
-  score: number;
-}
 
 function buildCypher(opts: SearchOptions): { cypher: string; params: Record<string, unknown> } {
   const targets: NodeLabel[] = opts.type ? [opts.type] : NODE_LABELS;
@@ -67,7 +63,7 @@ export async function search(opts: SearchOptions): Promise<SearchResult> {
   const startedAt = Date.now();
   const { cypher, params } = buildCypher(opts);
 
-  const rows = await executeRead<RawRow>(cypher, params);
+  const rows = await executeRead<NodeRow>(cypher, params, NodeRowSchema);
 
   const results: Entity[] = rows.map((row) => ({
     id: row.node.id,
