@@ -3,7 +3,29 @@ import { type TSchema } from "typebox";
 
 // AJV's CJS default export needs .default when imported as ESM
 const Ajv = ajvModule.default ?? ajvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = new Ajv();
+
+/**
+ * Thrown by `assertValid` when input fails AJV validation. Callers that
+ * need to distinguish schema-mismatch failures from other runtime errors
+ * should `instanceof`-check this class rather than substring-matching
+ * the message.
+ */
+export class ValidationError extends Error {
+  readonly context?: string;
+  readonly errors: ValidateFunction["errors"];
+
+  constructor(
+    errors: ValidateFunction["errors"],
+    context?: string,
+  ) {
+    const prefix = context ? `${context}: ` : "";
+    super(prefix + formatErrors(errors));
+    this.name = "ValidationError";
+    this.context = context;
+    this.errors = errors;
+  }
+}
 
 export interface Validator<T> {
   validate: (data: unknown) => data is T;
@@ -22,8 +44,7 @@ export function createValidator<T>(schema: TSchema): Validator<T> {
     validate: (data: unknown): data is T => validate(data) as boolean,
     assertValid: (data: unknown, context?: string): T => {
       if (!validate(data)) {
-        const prefix = context ? `${context}: ` : "";
-        throw new Error(prefix + formatErrors(validate.errors));
+        throw new ValidationError(validate.errors, context);
       }
       return data as T;
     },

@@ -31,7 +31,7 @@ export type Entity = Static<typeof EntitySchema>;
 export const SearchResultSchema = Type.Object({
   term: Type.String(),
   type: Type.Union([NodeLabelEnum, Type.Null()]),
-  limit: Type.Integer(),
+  limit: Type.Integer({ minimum: 1, maximum: 100 }),
   totalCount: Type.Integer({ minimum: 0 }),
   results: Type.Array(EntitySchema),
   durationMs: Type.Integer({ minimum: 0 }),
@@ -56,6 +56,7 @@ export const ErrorPayloadSchema = Type.Object({
     Type.Literal("invalid_input"),
     Type.Literal("neo4j_unreachable"),
     Type.Literal("neo4j_timeout"),
+    Type.Literal("neo4j_auth_failure"),
     Type.Literal("schema_mismatch"),
     Type.Literal("unexpected"),
   ]),
