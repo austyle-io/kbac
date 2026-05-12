@@ -21,16 +21,6 @@ ON MATCH SET
 // Additional tools needed by meta-frameworks
 // ============================================================================
 
-MERGE (t:Tool {id: '1password'})
-ON CREATE SET
-  t.name = '1Password',
-  t.type = 'platform',
-  t.description = 'Password manager with biometric auth and CLI (op)',
-  t.created = datetime(),
-  t.updated = datetime()
-ON MATCH SET
-  t.updated = datetime();
-
 MERGE (t:Tool {id: 'docker-compose'})
 ON CREATE SET
   t.name = 'Docker Compose',
@@ -53,10 +43,6 @@ ON MATCH SET
   t.updated = datetime();
 
 // Tool domain memberships
-MATCH (t:Tool {id: '1password'}), (d:Domain {id: 'credential-management'})
-MERGE (t)-[:BELONGS_TO]->(d)
-RETURN t.id + ' -> ' + d.id AS belongs_to;
-
 MATCH (t:Tool {id: 'docker-compose'}), (d:Domain {id: 'infrastructure'})
 MERGE (t)-[:BELONGS_TO]->(d)
 RETURN t.id + ' -> ' + d.id AS belongs_to;
@@ -67,11 +53,6 @@ RETURN t.id + ' -> ' + d.id AS belongs_to;
 
 // Tool dependencies
 MATCH (a:Tool {id: 'docker-compose'}), (b:Tool {id: 'docker'})
-MERGE (a)-[r:DEPENDS_ON]->(b)
-ON CREATE SET r.type = 'runtime'
-RETURN a.id + ' -[DEPENDS_ON]-> ' + b.id AS depends_on;
-
-MATCH (a:Tool {id: 'varlock'}), (b:Tool {id: '1password'})
 MERGE (a)-[r:DEPENDS_ON]->(b)
 ON CREATE SET r.type = 'runtime'
 RETURN a.id + ' -[DEPENDS_ON]-> ' + b.id AS depends_on;
@@ -121,15 +102,6 @@ ON CREATE SET
 ON MATCH SET
   c.updated = datetime();
 
-MERGE (c:Concept {id: 'biometric-auth'})
-ON CREATE SET
-  c.name = 'Biometric Auth',
-  c.description = 'Using fingerprint or face recognition for secret resolution at runtime',
-  c.created = datetime(),
-  c.updated = datetime()
-ON MATCH SET
-  c.updated = datetime();
-
 MERGE (c:Concept {id: 'compile-time-runtime-unification'})
 ON CREATE SET
   c.name = 'Compile-Time / Runtime Unification',
@@ -156,20 +128,12 @@ MATCH (c:Concept {id: 'image-pinning'}), (d:Domain {id: 'infrastructure'})
 MERGE (c)-[:BELONGS_TO]->(d)
 RETURN c.id + ' -> ' + d.id AS belongs_to;
 
-MATCH (c:Concept {id: 'biometric-auth'}), (d:Domain {id: 'credential-management'})
-MERGE (c)-[:BELONGS_TO]->(d)
-RETURN c.id + ' -> ' + d.id AS belongs_to;
-
 MATCH (c:Concept {id: 'compile-time-runtime-unification'}), (d:Domain {id: 'validation'})
 MERGE (c)-[:BELONGS_TO]->(d)
 RETURN c.id + ' -> ' + d.id AS belongs_to;
 
 // Concept implementations
 MATCH (t:Tool {id: 'typebox'}), (c:Concept {id: 'compile-time-runtime-unification'})
-MERGE (t)-[:IMPLEMENTS]->(c)
-RETURN t.id + ' -[IMPLEMENTS]-> ' + c.id AS implements;
-
-MATCH (t:Tool {id: '1password'}), (c:Concept {id: 'biometric-auth'})
 MERGE (t)-[:IMPLEMENTS]->(c)
 RETURN t.id + ' -[IMPLEMENTS]-> ' + c.id AS implements;
 
@@ -225,41 +189,6 @@ MERGE (s)-[:APPLIES]->(c)
 RETURN s.id + ' -[APPLIES]-> ' + c.id AS applies;
 
 MATCH (s:System {id: 'typebox-ajv-validation'}), (c:Concept {id: 'compile-time-runtime-unification'})
-MERGE (s)-[:APPLIES]->(c)
-RETURN s.id + ' -[APPLIES]-> ' + c.id AS applies;
-
-// ============================================================================
-// System: Varlock+1Password Credential Pipeline
-// ============================================================================
-// Pattern: .env.schema (committed) → op() references → varlock run →
-// 1Password biometric auth → env vars injected into subprocess.
-// Secrets never touch disk or git.
-
-MERGE (s:System {id: 'varlock-1password-pipeline'})
-ON CREATE SET
-  s.name = 'Varlock+1Password Credential Pipeline',
-  s.purpose = 'Zero-plaintext secret management for development',
-  s.description = 'Committed .env.schema with op() references is resolved at runtime via 1Password biometric auth. Varlock injects secrets as environment variables into subprocesses. AI agents see the schema shape but never credential values. @sensitive annotation enables stdout masking.',
-  s.created = datetime(),
-  s.updated = datetime()
-ON MATCH SET
-  s.updated = datetime();
-
-MATCH (s:System {id: 'varlock-1password-pipeline'}), (t:Tool {id: 'varlock'})
-MERGE (s)-[r:USES]->(t)
-ON CREATE SET r.role = 'env-resolver'
-RETURN s.id + ' -[USES]-> ' + t.id AS uses;
-
-MATCH (s:System {id: 'varlock-1password-pipeline'}), (t:Tool {id: '1password'})
-MERGE (s)-[r:USES]->(t)
-ON CREATE SET r.role = 'secret-store'
-RETURN s.id + ' -[USES]-> ' + t.id AS uses;
-
-MATCH (s:System {id: 'varlock-1password-pipeline'}), (c:Concept {id: 'credential-injection'})
-MERGE (s)-[:APPLIES]->(c)
-RETURN s.id + ' -[APPLIES]-> ' + c.id AS applies;
-
-MATCH (s:System {id: 'varlock-1password-pipeline'}), (c:Concept {id: 'biometric-auth'})
 MERGE (s)-[:APPLIES]->(c)
 RETURN s.id + ' -[APPLIES]-> ' + c.id AS applies;
 
@@ -372,11 +301,6 @@ MERGE (kbac)-[r:DEPENDS_ON]->(sub)
 ON CREATE SET r.type = 'incorporates'
 RETURN kbac.id + ' -[DEPENDS_ON]-> ' + sub.id AS depends_on;
 
-MATCH (kbac:System {id: 'kbac'}), (sub:System {id: 'varlock-1password-pipeline'})
-MERGE (kbac)-[r:DEPENDS_ON]->(sub)
-ON CREATE SET r.type = 'incorporates'
-RETURN kbac.id + ' -[DEPENDS_ON]-> ' + sub.id AS depends_on;
-
 MATCH (kbac:System {id: 'kbac'}), (sub:System {id: 'neo4j-docker-infra'})
 MERGE (kbac)-[r:DEPENDS_ON]->(sub)
 ON CREATE SET r.type = 'incorporates'
@@ -409,10 +333,6 @@ RETURN s.id + ' -[APPLIES]-> ' + c.id AS applies;
 // ============================================================================
 
 MATCH (s:System {id: 'typebox-ajv-validation'}), (d:Domain {id: 'meta-frameworks'})
-MERGE (s)-[:BELONGS_TO]->(d)
-RETURN s.id + ' -> ' + d.id AS belongs_to;
-
-MATCH (s:System {id: 'varlock-1password-pipeline'}), (d:Domain {id: 'meta-frameworks'})
 MERGE (s)-[:BELONGS_TO]->(d)
 RETURN s.id + ' -> ' + d.id AS belongs_to;
 

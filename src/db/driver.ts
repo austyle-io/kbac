@@ -11,7 +11,7 @@ export function getDriver(): Driver {
 
   if (!password) {
     throw new Error(
-      "NEO4J_PASSWORD is required. Run via: npx varlock run -- ...",
+      "NEO4J_PASSWORD is required. Set it in .env (copy .env.example to .env and fill in the password), or export it in your shell before invoking.",
     );
   }
 

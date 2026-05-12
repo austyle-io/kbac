@@ -2,7 +2,7 @@
 
 ## Overview
 
-kbac (knowledge base as code) runs a Neo4j 2026.x graph database in Docker, interacted with via host-installed `cypher-shell` and a TypeScript project using `neo4j-driver`. Credentials are managed by Varlock with 1Password — no plaintext secrets anywhere.
+kbac (knowledge base as code) runs a Neo4j 2026.x graph database in Docker, interacted with via host-installed `cypher-shell` and a TypeScript project using `neo4j-driver`. Credentials are loaded from a gitignored `.env` file using Node 22+'s native `--env-file-if-exists` flag, with real environment variables taking precedence — no plaintext secrets in the repo.
 
 ## Stack
 
@@ -12,8 +12,6 @@ kbac (knowledge base as code) runs a Neo4j 2026.x graph database in Docker, inte
 | APOC Core | `2026.03` | Officially supported procedures (cypher/json/csv export) |
 | APOC Extended | `2026.02.0` | Community-maintained procedures (arrow/parquet/xls export) |
 | Cypher | 25 (default) | Query language |
-| Varlock | `0.7.x` | Credential injection from `.env.schema` |
-| @varlock/1password-plugin | `0.3.x` | Resolves `op()` references via desktop app auth |
 | neo4j-driver | `6.x` | TypeScript Bolt client |
 | TypeBox | `1.x` | JSON Schema type builder — compile-time + runtime types |
 | AJV | `8.x` | JSON Schema validator — compiles TypeBox schemas |
@@ -26,7 +24,7 @@ kbac (knowledge base as code) runs a Neo4j 2026.x graph database in Docker, inte
 
 ```
 kbac/
-├── .env.schema                     # Varlock schema (committed, no secrets)
+├── .env.example                    # Template (committed); cp to .env (gitignored)
 ├── .yarnrc.yml                     # Yarn 3.7.0 config (node-modules linker)
 ├── docker/
 │   └── docker-compose.yml          # Neo4j 2026.02.3-community (1G heap, query logging)
@@ -49,7 +47,12 @@ kbac/
 │   ├── confirm-destructive.ts      # Two-step confirmation gate for destructive ops
 │   ├── db-backup.ts                # Streams graph export via APOC to backups/
 │   ├── db-introspect.ts            # Dumps graph schema to stdout
-│   └── db-wait.ts                  # Polls until Neo4j accepts Bolt connections
+│   ├── db-wait.ts                  # Polls until Neo4j accepts Bolt connections
+│   ├── kbac                        # Bash wrapper that loads .env and execs kbac.ts
+│   ├── kbac.ts                     # argv dispatcher for the `kbac search ...` CLI
+│   ├── kbac.test.ts                # vitest cases for argv parsing + classifyError
+│   ├── run-cypher.ts               # Reads .cypher files (path-safe), executes via Bolt
+│   └── run-cypher.test.ts          # vitest cases for resolveSafeCypherPath
 ├── src/
 │   ├── db/
 │   │   ├── driver.ts               # Neo4j driver singleton (disableLosslessIntegers, pooling)
@@ -60,8 +63,7 @@ kbac/
 │   │   └── index.ts                # Barrel re-export
 │   ├── validation/
 │   │   └── validator.ts            # createValidator(schema) → AJV compiled validator
-│   ├── env.d.ts                    # Generated types from .env.schema (varlock typegen)
-│   └── run-cypher.ts               # Reads .cypher files, executes via Bolt
+│   └── env.d.ts                    # ProcessEnv augmentation for NEO4J_* keys
 ├── package.json
 ├── tsconfig.json
 └── .gitignore
@@ -69,32 +71,39 @@ kbac/
 
 ## Credential Flow
 
-Varlock resolves credentials at process launch — the application never sees `op://` references.
+Credentials live in a gitignored `.env` file at the repo root, loaded
+by Node 22+'s native `--env-file-if-exists` flag. The application
+reads `process.env.NEO4J_PASSWORD` directly — no resolver layer.
 
-```
-.env.schema (committed)
+```text
+.env.example (committed, no secrets)
     │
-    │  op("op://vault/Neo4j 2026/password")
+    │  cp .env.example .env  → fill in NEO4J_PASSWORD
     │
     ▼
-varlock run ──► 1Password desktop app (biometric) ──► resolved NEO4J_PASSWORD
+.env (gitignored)
+    │
+    │  node --env-file-if-exists=.env --import tsx ...
+    │  docker compose --env-file=.env ...
+    │
+    ▼
+process.env.NEO4J_PASSWORD
     │
     ├──► docker compose (NEO4J_AUTH=neo4j/${NEO4J_PASSWORD})
     ├──► cypher-shell -p "$NEO4J_PASSWORD"
-    └──► tsx bin/run-cypher.ts (process.env.NEO4J_PASSWORD)
+    └──► tsx bin/*.ts (process.env.NEO4J_PASSWORD)
 ```
 
-The `.env.schema` is safe to commit — it contains only `op()` references and static config values. AI agents see the schema shape but never credential values. The `@sensitive` annotation enables automatic stdout masking.
+**Precedence:** real environment variables (exported in shell or set
+inline like `NEO4J_PASSWORD=foo yarn db:up`) win over the `.env` file.
+`--env-file-if-exists` only sets keys that aren't already in
+`process.env`, which gives free support for inline overrides and CI
+environments where credentials come from the runner's secret store.
 
-The 1Password item was created via:
-
-```bash
-op item create --category=password --title='Neo4j 2026' \
-  --vault='4clfbn6i66sfhekqleb3fitgia' \
-  --generate-password='20,letters,digits,symbols'
-```
-
-**Fallback if Varlock breaks:** Replace `varlock run` with `op run --env-file` and convert `.env.schema` to a plain `.env` with `op://` references. The Docker Compose config and TypeScript code are Varlock-independent — they just read `process.env`.
+**No `.env` at all** is supported — `--env-file-if-exists` is a
+graceful no-op when the file is missing. The process then runs with
+whatever real env vars the caller supplied. Useful for CI and for
+running individual commands with `NEO4J_PASSWORD=...` prefixed.
 
 ## Docker Container
 
@@ -114,11 +123,14 @@ op item create --category=password --title='Neo4j 2026' \
 ### cypher-shell (ad-hoc queries, .cypher file piping)
 
 ```bash
+# Source .env so cypher-shell sees the password
+set -a; source .env; set +a
+
 # Ad-hoc query
-npx varlock run -- sh -c 'cypher-shell -a bolt://localhost:7688 -u neo4j -p "$NEO4J_PASSWORD" "MATCH (n) RETURN count(n);"'
+cypher-shell -a "$NEO4J_URI" -u "$NEO4J_USERNAME" -p "$NEO4J_PASSWORD" "MATCH (n) RETURN count(n);"
 
 # Run a .cypher file
-npx varlock run -- sh -c 'cypher-shell -a bolt://localhost:7688 -u neo4j -p "$NEO4J_PASSWORD" < cypher/file.cypher'
+cypher-shell -a "$NEO4J_URI" -u "$NEO4J_USERNAME" -p "$NEO4J_PASSWORD" < cypher/file.cypher
 ```
 
 Homebrew `cypher-shell` is 2026.03.1 (one minor ahead of container). Bolt is backward compatible. Fallback: `docker exec neo4j-2026 cypher-shell` for a version-matched client.
@@ -129,7 +141,7 @@ Homebrew `cypher-shell` is 2026.03.1 (one minor ahead of container). Bolt is bac
 yarn cypher cypher/file.cypher
 ```
 
-`bin/run-cypher.ts` reads `.cypher` files from disk, splits on semicolons, executes each statement via Bolt, and prints structured results. Varlock generates `src/env.d.ts` which augments `NodeJS.ProcessEnv` — so `process.env.NEO4J_PASSWORD` is typed as `string` (not `string | undefined`).
+`bin/run-cypher.ts` reads `.cypher` files from disk, splits on semicolons, executes each statement via Bolt, and prints structured results. `src/env.d.ts` is a hand-maintained `ProcessEnv` augmentation for the four `NEO4J_*` keys.
 
 ## Graph Domain Model
 
@@ -188,7 +200,7 @@ The service layer (`src/db/neo4j-service.ts`) wraps `session.executeRead()` / `s
 ## yarn Scripts
 
 ```bash
-yarn db:up                              # Start container (varlock injects credentials)
+yarn db:up                              # Start container (reads .env via docker compose --env-file)
 yarn db:down                            # Stop container
 yarn db:reset                           # Destroy volume + recreate + wait + seed
 yarn db:wait                            # Poll until Neo4j accepts Bolt connections
@@ -211,7 +223,7 @@ yarn db:introspect                      # Dump graph schema to stdout
 | 2026.x over 5.26 LTS | Security + modern defaults | Debian 13 base (A health grade), Cypher 25, cleaner image. Accepted trade-off: no LTS, rolling monthly releases |
 | Cypher 25 default | Fix breakage early | Fresh container with no data — best time to find Cypher 25 incompatibilities |
 | Exact image pin (`2026.02.3`) | Prevent surprise upgrades | Learned from prior incident where `neo4j:latest` auto-upgraded and broke MCP |
-| Varlock over plain .env | AI-safe credential management | Schema committed, values never in repo. Type generation bonus |
+| Plain .env via Node --env-file | Zero-dep credential loading | Node 22+ ships --env-file-if-exists; real env vars override file values; no external auth service required. |
 | APOC Core + Extended | Both installed | Core for officially supported procedures (cypher export). Extended for community procedures (arrow/parquet). Both coexist via NEO4J_PLUGINS. |
 | Separate repo from dotfiles | Separation of concerns | This is a project, not shell config |
 | No MCP | CLI-first workflow | Interact via scripts and tooling, not through AI agent memory layer |
@@ -221,8 +233,7 @@ yarn db:introspect                      # Dump graph schema to stdout
 1. **APOC Extended version lag** — Community-maintained, currently at 2026.02.0. Must verify compatibility before upgrading Neo4j past 2026.02.
 2. **No LTS** — Neo4j 2026.02 is only supported until 2026.03 ships. Pinned and upgraded on our own schedule.
 3. **cypher-shell version mismatch** — Homebrew ships 2026.03.1 vs container 2026.02.3. Bolt protocol handles this, but `docker exec` fallback exists.
-4. **Varlock is v0.7.x** — New tool, API may change. Migration path: `op run` + plain `.env` file.
-5. **Varlock `op()` parser** — Spaces in 1Password item names require quoted arguments: `op("op://vault/Neo4j 2026/password")` not `op(op://vault/Neo4j 2026/password)`.
+4. **.env discipline** — `.env` is gitignored. Never commit it. `.env.example` is the canonical template; keep it in sync with the actual keys consumed by the code.
 
 ## Fast Follows
 
