@@ -1,5 +1,6 @@
 import { readFileSync, realpathSync } from "fs";
 import { resolve, relative, isAbsolute } from "path";
+import { pathToFileURL } from "url";
 import { loadEnv } from "../src/config/index.js";
 import { closeDriver, withSession } from "../src/db/index.js";
 import { runStatement, splitCypherStatements } from "../src/cypher/index.js";
@@ -85,6 +86,9 @@ function main(): void {
 }
 
 // Run only when invoked as a script (not when imported by tests).
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL correctly URL-encodes spaces and handles Windows drive
+// letters (e.g. `C:\path` → `file:///C:/path`), which a naive
+// `file://${process.argv[1]}` template string would mangle.
+if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main();
 }

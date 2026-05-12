@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import neo4j from "neo4j-driver";
 import {
   search,
@@ -243,7 +243,7 @@ async function main(): Promise<number> {
   } catch (e) {
     const payload: ErrorPayload = {
       error: "invalid_input",
-      message: (e as Error).message,
+      message: e instanceof Error ? e.message : String(e),
     };
     process.stderr.write(renderError(payload, parsed.json) + "\n");
     return 2;
@@ -270,6 +270,7 @@ async function main(): Promise<number> {
 }
 
 // Run only when invoked as a script (not when imported by tests).
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL correctly URL-encodes spaces and handles Windows paths.
+if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().then((code) => process.exit(code));
 }

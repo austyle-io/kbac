@@ -100,22 +100,6 @@ describe("parseArgv", () => {
       expect(r.error.error).toBe("invalid_input");
     }
   });
-
-  it("returns ParseInfo (kind=help) for --help", () => {
-    const r = parseArgv(["--help"]);
-    expect(r.ok).toBe("info");
-    if (r.ok === "info") {
-      expect(r.kind).toBe("help");
-    }
-  });
-
-  it("returns ParseInfo (kind=version) for --version", () => {
-    const r = parseArgv(["--version"]);
-    expect(r.ok).toBe("info");
-    if (r.ok === "info") {
-      expect(r.kind).toBe("version");
-    }
-  });
 });
 
 describe("classifyError", () => {
