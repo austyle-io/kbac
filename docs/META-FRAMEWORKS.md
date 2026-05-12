@@ -171,7 +171,7 @@ cypher/
 
 ## How They Compose
 
-kbac is the top-level System that incorporates all four meta-frameworks:
+kbac is the top-level System that incorporates all three meta-frameworks:
 
 ```
 kbac

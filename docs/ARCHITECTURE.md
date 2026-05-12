@@ -47,7 +47,12 @@ kbac/
 │   ├── confirm-destructive.ts      # Two-step confirmation gate for destructive ops
 │   ├── db-backup.ts                # Streams graph export via APOC to backups/
 │   ├── db-introspect.ts            # Dumps graph schema to stdout
-│   └── db-wait.ts                  # Polls until Neo4j accepts Bolt connections
+│   ├── db-wait.ts                  # Polls until Neo4j accepts Bolt connections
+│   ├── kbac                        # Bash wrapper that loads .env and execs kbac.ts
+│   ├── kbac.ts                     # argv dispatcher for the `kbac search ...` CLI
+│   ├── kbac.test.ts                # vitest cases for argv parsing + classifyError
+│   ├── run-cypher.ts               # Reads .cypher files (path-safe), executes via Bolt
+│   └── run-cypher.test.ts          # vitest cases for resolveSafeCypherPath
 ├── src/
 │   ├── db/
 │   │   ├── driver.ts               # Neo4j driver singleton (disableLosslessIntegers, pooling)
@@ -58,8 +63,7 @@ kbac/
 │   │   └── index.ts                # Barrel re-export
 │   ├── validation/
 │   │   └── validator.ts            # createValidator(schema) → AJV compiled validator
-│   ├── env.d.ts                    # ProcessEnv augmentation for NEO4J_* keys
-│   └── run-cypher.ts               # Reads .cypher files, executes via Bolt
+│   └── env.d.ts                    # ProcessEnv augmentation for NEO4J_* keys
 ├── package.json
 ├── tsconfig.json
 └── .gitignore
@@ -71,7 +75,7 @@ Credentials live in a gitignored `.env` file at the repo root, loaded
 by Node 22+'s native `--env-file-if-exists` flag. The application
 reads `process.env.NEO4J_PASSWORD` directly — no resolver layer.
 
-```
+```text
 .env.example (committed, no secrets)
     │
     │  cp .env.example .env  → fill in NEO4J_PASSWORD
