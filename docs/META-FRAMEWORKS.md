@@ -1,18 +1,18 @@
 # Meta-Frameworks & Systems
 
-kbac incorporates four reusable meta-frameworks. Each is a System node in the knowledge graph with its own tools, concepts, and architectural pattern.
+kbac incorporates three reusable meta-frameworks. Each is a System node in the knowledge graph with its own tools, concepts, and architectural pattern.
 
 ```
-                              ┌─────────┐
-                              │  kbac   │
-                              └────┬────┘
-                 DEPENDS_ON (incorporates)
-           ┌──────────┬──────────┬──────────┐
-           ▼          ▼          ▼          ▼
-  ┌────────────┐ ┌──────────┐ ┌─────────┐ ┌──────────┐
-  │ TypeBox+AJV│ │ Varlock+ │ │Neo4j+   │ │ Cypher   │
-  │ Validation │ │1Password │ │Docker   │ │ as Code  │
-  └────────────┘ └──────────┘ └─────────┘ └──────────┘
+                       ┌─────────┐
+                       │  kbac   │
+                       └────┬────┘
+              DEPENDS_ON (incorporates)
+            ┌──────────────┼──────────────┐
+            ▼              ▼              ▼
+   ┌────────────┐  ┌─────────────┐  ┌──────────┐
+   │ TypeBox+AJV│  │ Neo4j+      │  │ Cypher   │
+   │ Validation │  │ Docker      │  │ as Code  │
+   └────────────┘  └─────────────┘  └──────────┘
 ```
 
 ---
@@ -69,50 +69,7 @@ Neo4j records (unknown shape)
 
 ---
 
-## 2. Varlock+1Password Credential Pipeline
-
-**Purpose:** Zero-plaintext secret management for development.
-
-**The pattern:** Committed `.env.schema` contains `op()` references to 1Password — not actual secrets. At runtime, `varlock run` resolves these via 1Password desktop app biometric auth and injects real values as environment variables into the subprocess. AI agents see the schema shape but never credential values.
-
-```
-.env.schema (committed to git)
-    │
-    │  NEO4J_PASSWORD=op("op://vault/Neo4j 2026/password")
-    │
-    ▼
-varlock run ──► 1Password desktop app
-    │                    │
-    │              biometric auth
-    │                    │
-    │              ◄─── resolved value
-    │
-    ▼
-Subprocess environment
-    │
-    ├── docker compose  (NEO4J_AUTH=neo4j/${NEO4J_PASSWORD})
-    ├── cypher-shell    (-p "$NEO4J_PASSWORD")
-    └── tsx / node      (process.env.NEO4J_PASSWORD)
-```
-
-**Tools:**
-
-| Tool | Role |
-|------|------|
-| Varlock | Env resolver — reads `.env.schema`, resolves `op()` references, injects env vars |
-| 1Password | Secret store — biometric-gated credential vault with CLI (`op`) |
-
-**Concepts applied:**
-- **Credential Injection** — secrets resolved at process launch, never stored on disk
-- **Biometric Auth** — fingerprint/face required to decrypt secrets
-
-**Key constraint:** The `op` CLI requires 1Password desktop app connectivity. In sandboxed environments (CI, Claude Code sandbox), commands that resolve `op()` references must be run by the user via `!` prefix.
-
-**Gotcha:** Spaces in 1Password item names require quoted arguments: `op("op://vault/Neo4j 2026/password")` not `op(op://vault/Neo4j 2026/password)`.
-
----
-
-## 3. Neo4j+Docker Graph Infrastructure
+## 2. Neo4j+Docker Graph Infrastructure
 
 **Purpose:** Reproducible graph database with pinned versions.
 
@@ -154,7 +111,7 @@ docker-compose.yml
 
 ---
 
-## 4. Cypher as Code
+## 3. Cypher as Code
 
 **Purpose:** Version-controlled graph schema, data, and queries.
 
@@ -221,9 +178,6 @@ kbac
  ├── DEPENDS_ON (incorporates) → TypeBox+AJV Validation Stack
  │     └── validates data at the neo4j-driver boundary
  │
- ├── DEPENDS_ON (incorporates) → Varlock+1Password Credential Pipeline
- │     └── injects NEO4J_PASSWORD into all subprocesses
- │
  ├── DEPENDS_ON (incorporates) → Neo4j+Docker Graph Infrastructure
  │     └── provides the containerized graph database
  │
@@ -231,6 +185,6 @@ kbac
        └── defines the schema, data, and query patterns
 ```
 
-The meta-frameworks are independently reusable. TypeBox+AJV works in any TypeScript project. Varlock+1Password works with any secret-consuming tool. Neo4j+Docker works with any Cypher-based workflow. Cypher as Code works with any Neo4j deployment.
+The meta-frameworks are independently reusable. TypeBox+AJV works in any TypeScript project. Neo4j+Docker works with any Cypher-based workflow. Cypher as Code works with any Neo4j deployment.
 
-What makes kbac unique is the composition: the validation stack validates data flowing through the graph infrastructure, using credentials injected by the pipeline, with schema and data defined in cypher files.
+What makes kbac unique is the composition: the validation stack validates data flowing through the graph infrastructure, with schema and data defined in cypher files. Credentials come from a gitignored `.env` file loaded by Node 22+'s `--env-file-if-exists` flag.

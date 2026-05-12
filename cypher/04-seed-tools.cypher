@@ -64,18 +64,6 @@ ON MATCH SET
   t.updated = datetime()
 RETURN t.id AS id, t.name AS name;
 
-MERGE (t:Tool {id: 'varlock'})
-ON CREATE SET
-  t.name = 'Varlock',
-  t.type = 'cli',
-  t.version = '0.7.x',
-  t.description = 'Environment variable manager with 1Password integration',
-  t.created = datetime(),
-  t.updated = datetime()
-ON MATCH SET
-  t.updated = datetime()
-RETURN t.id AS id, t.name AS name;
-
 MERGE (t:Tool {id: 'tsx'})
 ON CREATE SET
   t.name = 'tsx',
@@ -154,11 +142,6 @@ MATCH (t:Tool {id: 'ajv'}), (d:Domain {id: 'validation'})
 MERGE (t)-[:BELONGS_TO]->(d)
 RETURN t.id + ' -> ' + d.id AS belongs_to;
 
-// varlock -> credential-management
-MATCH (t:Tool {id: 'varlock'}), (d:Domain {id: 'credential-management'})
-MERGE (t)-[:BELONGS_TO]->(d)
-RETURN t.id + ' -> ' + d.id AS belongs_to;
-
 // tsx -> typescript
 MATCH (t:Tool {id: 'tsx'}), (d:Domain {id: 'typescript'})
 MERGE (t)-[:BELONGS_TO]->(d)
@@ -210,12 +193,6 @@ RETURN a.id + ' -[DEPENDS_ON]-> ' + b.id AS depends_on;
 MATCH (a:Tool {id: 'ajv'}), (b:Tool {id: 'typebox'})
 MERGE (a)-[r:DEPENDS_ON]->(b)
 ON CREATE SET r.type = 'runtime'
-RETURN a.id + ' -[DEPENDS_ON]-> ' + b.id AS depends_on;
-
-// varlock depends on docker (optional) — varlock can inject into docker compose
-MATCH (a:Tool {id: 'varlock'}), (b:Tool {id: 'docker'})
-MERGE (a)-[r:DEPENDS_ON]->(b)
-ON CREATE SET r.type = 'optional'
 RETURN a.id + ' -[DEPENDS_ON]-> ' + b.id AS depends_on;
 
 // --- COMPOSES_WITH relationships (Tool -> Tool) ---

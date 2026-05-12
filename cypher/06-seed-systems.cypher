@@ -44,12 +44,6 @@ MERGE (s)-[r:USES]->(t)
 ON CREATE SET r.role = 'runtime-validation'
 RETURN s.id + ' -[USES]-> ' + t.id AS uses;
 
-// kbac uses varlock for credential management
-MATCH (s:System {id: 'kbac'}), (t:Tool {id: 'varlock'})
-MERGE (s)-[r:USES]->(t)
-ON CREATE SET r.role = 'credential-management'
-RETURN s.id + ' -[USES]-> ' + t.id AS uses;
-
 // kbac uses tsx as typescript runner
 MATCH (s:System {id: 'kbac'}), (t:Tool {id: 'tsx'})
 MERGE (s)-[r:USES]->(t)
@@ -76,11 +70,6 @@ RETURN s.id + ' -[APPLIES]-> ' + c.id AS applies;
 
 // kbac applies runtime-validation
 MATCH (s:System {id: 'kbac'}), (c:Concept {id: 'runtime-validation'})
-MERGE (s)-[:APPLIES]->(c)
-RETURN s.id + ' -[APPLIES]-> ' + c.id AS applies;
-
-// kbac applies credential-injection
-MATCH (s:System {id: 'kbac'}), (c:Concept {id: 'credential-injection'})
 MERGE (s)-[:APPLIES]->(c)
 RETURN s.id + ' -[APPLIES]-> ' + c.id AS applies;
 

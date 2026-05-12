@@ -46,16 +46,6 @@ ON MATCH SET
   c.updated = datetime()
 RETURN c.id AS id, c.name AS name;
 
-MERGE (c:Concept {id: 'credential-injection'})
-ON CREATE SET
-  c.name = 'Credential Injection',
-  c.description = 'Runtime resolution of secrets',
-  c.created = datetime(),
-  c.updated = datetime()
-ON MATCH SET
-  c.updated = datetime()
-RETURN c.id AS id, c.name AS name;
-
 MERGE (c:Concept {id: 'data-as-code'})
 ON CREATE SET
   c.name = 'Data as Code',
@@ -108,11 +98,6 @@ MATCH (t:Tool {id: 'neo4j'}), (c:Concept {id: 'knowledge-graph'})
 MERGE (t)-[:IMPLEMENTS]->(c)
 RETURN t.id + ' -[IMPLEMENTS]-> ' + c.id AS implements;
 
-// varlock implements credential-injection
-MATCH (t:Tool {id: 'varlock'}), (c:Concept {id: 'credential-injection'})
-MERGE (t)-[:IMPLEMENTS]->(c)
-RETURN t.id + ' -[IMPLEMENTS]-> ' + c.id AS implements;
-
 // neo4j-driver implements graph-traversal
 MATCH (t:Tool {id: 'neo4j-driver'}), (c:Concept {id: 'graph-traversal'})
 MERGE (t)-[:IMPLEMENTS]->(c)
@@ -137,11 +122,6 @@ RETURN c.id + ' -> ' + d.id AS belongs_to;
 
 // knowledge-graph -> graph-databases
 MATCH (c:Concept {id: 'knowledge-graph'}), (d:Domain {id: 'graph-databases'})
-MERGE (c)-[:BELONGS_TO]->(d)
-RETURN c.id + ' -> ' + d.id AS belongs_to;
-
-// credential-injection -> credential-management
-MATCH (c:Concept {id: 'credential-injection'}), (d:Domain {id: 'credential-management'})
 MERGE (c)-[:BELONGS_TO]->(d)
 RETURN c.id + ' -> ' + d.id AS belongs_to;
 

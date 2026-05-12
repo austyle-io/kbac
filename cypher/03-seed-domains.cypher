@@ -51,17 +51,6 @@ ON MATCH SET
   d.updated = datetime()
 RETURN d.id AS id, d.name AS name;
 
-// Credential Management — secrets and authentication
-MERGE (d:Domain {id: 'credential-management'})
-ON CREATE SET
-  d.name = 'Credential Management',
-  d.category = 'security',
-  d.description = 'Secrets and authentication',
-  d.created = datetime(),
-  d.updated = datetime()
-ON MATCH SET
-  d.updated = datetime()
-RETURN d.id AS id, d.name AS name;
 
 // Validation — data validation and type checking
 MERGE (d:Domain {id: 'validation'})

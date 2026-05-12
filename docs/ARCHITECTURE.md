@@ -101,12 +101,6 @@ graceful no-op when the file is missing. The process then runs with
 whatever real env vars the caller supplied. Useful for CI and for
 running individual commands with `NEO4J_PASSWORD=...` prefixed.
 
-**Historical note:** before this design, credentials were resolved at
-runtime by `varlock` from 1Password references in a committed
-`.env.schema`. That gave AI-safe credential management but required
-biometric re-auth every few hours, which created a dark-factory
-anti-pattern (tools silently broke when the session expired).
-
 ## Docker Container
 
 | Setting | Value |
@@ -225,7 +219,7 @@ yarn db:introspect                      # Dump graph schema to stdout
 | 2026.x over 5.26 LTS | Security + modern defaults | Debian 13 base (A health grade), Cypher 25, cleaner image. Accepted trade-off: no LTS, rolling monthly releases |
 | Cypher 25 default | Fix breakage early | Fresh container with no data — best time to find Cypher 25 incompatibilities |
 | Exact image pin (`2026.02.3`) | Prevent surprise upgrades | Learned from prior incident where `neo4j:latest` auto-upgraded and broke MCP |
-| Plain .env via Node --env-file | Zero-dep credential loading | Node 22+ ships --env-file-if-exists; real env vars override file values; no external auth service required. Migrated away from Varlock+1Password (dark-factory: biometric re-auth every ~4 hours). |
+| Plain .env via Node --env-file | Zero-dep credential loading | Node 22+ ships --env-file-if-exists; real env vars override file values; no external auth service required. |
 | APOC Core + Extended | Both installed | Core for officially supported procedures (cypher export). Extended for community procedures (arrow/parquet). Both coexist via NEO4J_PLUGINS. |
 | Separate repo from dotfiles | Separation of concerns | This is a project, not shell config |
 | No MCP | CLI-first workflow | Interact via scripts and tooling, not through AI agent memory layer |
