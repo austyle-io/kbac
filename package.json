@@ -2,6 +2,9 @@
   "name": "kbac",
   "version": "1.0.0",
   "packageManager": "yarn@3.7.0",
+  "engines": {
+    "node": ">=22.9.0"
+  },
   "description": "",
   "type": "module",
   "directories": {

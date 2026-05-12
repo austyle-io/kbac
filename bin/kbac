@@ -12,8 +12,9 @@
 set -euo pipefail
 
 # Resolve symlinks so we can find the repo root even when invoked via
-# ~/.local/bin/kbac. `readlink -f` is not portable on macOS; the loop
-# below is the BSD-compatible equivalent.
+# ~/.local/bin/kbac. `readlink -f` works on macOS >= 12.3 (Monterey) and
+# modern Linux, but the loop below is the BSD-compatible equivalent for
+# older systems where -f may be missing.
 target="${BASH_SOURCE[0]}"
 while [ -L "$target" ]; do
   link="$(readlink "$target")"
@@ -23,6 +24,18 @@ while [ -L "$target" ]; do
   esac
 done
 repo_root="$(cd "$(dirname "$target")/.." && pwd)"
+
+# Node-version preflight: --env-file-if-exists was added in Node 22.9.0
+# (https://nodejs.org/api/cli.html). Older Node versions silently fail
+# with "is not allowed in NODE_OPTIONS" or accept the flag with no effect.
+node_version="$(node --version 2>/dev/null || echo 'v0.0.0')"
+node_major="${node_version#v}"; node_major="${node_major%%.*}"
+node_minor="${node_version#v*.}"; node_minor="${node_minor%%.*}"
+if [ "$node_major" -lt 22 ] || { [ "$node_major" -eq 22 ] && [ "$node_minor" -lt 9 ]; }; then
+  echo "kbac: Node $node_version is too old; --env-file-if-exists requires Node >= 22.9.0" >&2
+  echo "kbac: upgrade via 'brew upgrade node' or your version manager" >&2
+  exit 127
+fi
 
 cd "$repo_root"
 exec node --env-file-if-exists=.env --import tsx bin/kbac.ts "$@"
